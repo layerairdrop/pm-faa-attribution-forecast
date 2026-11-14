@@ -1,0 +1,2 @@
+# make.fun's local scaffolding: holds the entry owner's wallet address, so it must not be committed.
+.makefun/
