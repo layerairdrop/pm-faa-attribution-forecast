@@ -15,22 +15,23 @@ with the five values forced non-decreasing and rounded to 6 decimals.
 
 ## How it works
 
-1. **Spread.** `sigma` mixes three jump-robust estimates of the price diffs `d[i] = p[i] - p[i-1]`, each one
+1. **Spread.** `sigma` is one jump-robust estimate of the diffs `d[i] = p[i] - p[i-1]` over the last 240 of them,
    `1.4826 * median(|d|)` (a MAD estimate, so a single jump does not own the number), falling back to half the RMS
    when that median is exactly 0:
 
-       sigma = 0.55 * robust(last 120 diffs) + 0.30 * robust(last 720) + 0.15 * robust(all),  clamped to [0.00035, 0.05]
+       sigma = clamp(robustSigma(last 240 diffs), 0.0004, 0.05)
 
-   Markets with fewer than 6 prices get the flat `0.0025`.
-2. **Anchor.** `anchor` is the median of the last 1440 prices (or all of them), i.e. the day's typical level, and the
-   median walks a fifth of the way from `x` toward it:
+   Markets with fewer than 30 diffs get the flat `0.0025`.
+2. **Anchor.** `anchor` is the median of the last 240 prices, the level the market keeps returning to, and the median
+   walks 70% of the way from `x` toward it:
 
-       med(h) = x + (anchor - x) * 0.20 * (1 - exp(-h / 720))
+       med(h) = x + (anchor - x) * 0.70 * (1 - exp(-h / 720))
 
    If `|anchor - x| > 6 * sigma * sqrt(240)` the anchor is stale and `med(h) = x` instead.
-3. **Volatility path.** `vol(h) = sigma * h^0.54` — slightly super-diffusive, since price jumps cluster.
-4. **Quantiles.** `z = [-1.85, -0.72, 0, 0.72, 1.85]` for `[0.05, 0.25, 0.5, 0.75, 0.95]`: the tails are wider than a
-   normal's ±1.6449 so the 5% and 95% rows carry the jump risk, and the 25%/75% rows sit closer in than ±0.6745.
+3. **Volatility path.** `vol(h) = 0.65 * sigma * h^0.33` — sub-diffusive, below a random walk's `h^0.5`, because these
+   prices mean-revert: the forecast spread grows more slowly than `sqrt(h)`.
+4. **Quantiles.** `z = [-1.80, -0.70, 0, 0.70, 1.80]` for `[0.05, 0.25, 0.5, 0.75, 0.95]`: wider than a normal's
+   ±1.6449 at the 5% and 95% rows so they carry the jump risk, and slightly wider than ±0.6745 at the quartiles.
 
 Deterministic: no `Math.random`, no `Date`, inputs read in sorted name order, so the same input gives the same bytes.
 
