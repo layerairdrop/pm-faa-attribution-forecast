@@ -1,16 +1,16 @@
 // polymarket-faa-attribution-02 entry: an adaptive quantile forecaster. The house baseline is persistence with a fixed
 // spread, 0.0025 * sqrt(h). This entry keeps the same plumbing but measures each market's own spread from its last
-// 240 one-minute diffs, treats these prices as mean-reverting rather than drifting, and widens the tails past a
+// 480 one-minute diffs, treats these prices as mean-reverting rather than drifting, and widens the tails past a
 // normal's:
 //
-//   sigma    = 1.4826 * median(|d|) over the last 240 diffs (a MAD estimate, so one jump does not own the spread),
+//   sigma    = 1.4826 * median(|d|) over the last 480 one-minute diffs (a MAD estimate, so one jump does not own it),
 //              falling back to half the RMS when that median is exactly zero, clamped to [0.0004, 0.05]; a market
 //              with fewer than 30 diffs to measure gets the flat 0.0025;
-//   vol(h)   = 0.65 * sigma * h^0.33 for h = 1..240, sub-diffusive instead of a random walk's h^0.5, because these
+//   vol(h)   = 1.0 * sigma * h^0.42 for h = 1..240, sub-diffusive instead of a random walk's h^0.5, because these
 //              markets mean-revert and so the forecast spread must grow more slowly than sqrt(h);
-//   anchor   = median of the last 240 prices, and the median is pulled 70% of the way toward it over the horizon:
-//              med(h) = x + (anchor - x) * 0.70 * (1 - exp(-h/720)), abandoned for plain x when the gap is
-//              implausibly large (> 6 sigma sqrt(240)), i.e. the anchor is stale;
+//   anchor   = median of the last 480 prices, and the median is pulled 40% of the way toward it over the horizon:
+//              med(h) = x + (anchor - x) * 0.40 * (1 - exp(-h/720)), abandoned for plain x when the gap is
+//              implausibly large (> 6 sigma sqrt(480)), i.e. the anchor is stale;
 //   q_tau(h) = clamp(med(h) + z_tau * vol(h), 0, 1), rounded to 6 decimals, with z = +-1.80 at the tails and +-0.70
 //              at the quartiles (wider than the normal's 1.6449 and 0.6745), then forced non-decreasing across the
 //              row and clamped again.
@@ -38,13 +38,13 @@ const SIGMA_MAX = 0.05;
 /** Fewer diffs than this and the estimate is noise, so the flat case sigma stands in for it. */
 const MIN_DIFFS = 30;
 /** How much of the gap to the anchor the median closes, and the time constant it closes it over, in minutes. */
-const PULL = 0.7;
+const PULL = 0.4;
 const PULL_TAU = 720;
 /** Minutes of history the spread and the anchor both look back over. */
-const WINDOW = 240;
+const WINDOW = 480;
 /** vol(h) = SCALE * sigma * h^EXPONENT: below a random walk's 0.5 because these prices mean-revert. */
-const SCALE = 0.65;
-const EXPONENT = 0.33;
+const SCALE = 1.0;
+const EXPONENT = 0.42;
 
 interface CaseMarket {
   id: string;
